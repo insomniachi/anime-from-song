@@ -37,8 +37,9 @@ static class CaptureAndTag {
 
                 var sigBytes = Sig.Write(Analysis.SAMPLE_RATE, analysis.ProcessedSamples, finder);
                 var result = await ShazamApi.SendRequestAsync(tagId, analysis.ProcessedMs, sigBytes);
-                if(result.Success)
+                if(result.Success) {
                     return result;
+                }
 
                 retryMs = result.RetryMs;
                 if(retryMs == 0)

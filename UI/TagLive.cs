@@ -6,64 +6,82 @@ using System.Threading.Tasks;
 
 namespace Project;
 
-static class TagLive {
+internal static class TagLive
+{
+    public static async Task RunAsync(bool auto)
+    {
+        var prevTitle = default(string);
 
-    public static async Task RunAsync(bool auto) {
-        var prevUrl = default(string);
-
-        while(true) {
-            ConsoleHelper.WriteProgress("Listening... ");
-
+        while (true)
+        {
             var startTime = DateTime.Now;
 
-            try {
+            try
+            {
                 using var captureHelper = CreateCaptureHelper();
                 captureHelper.Start();
 
                 var result = await CaptureAndTag.RunAsync(captureHelper);
 
-                if(result.Success) {
-                    var text = result.Url != prevUrl ? result.Url : "...";
+                if (result.Success)
+                {
+                    var isNewTitle = result.Title != prevTitle;
 
-                    ConsoleHelper.ClearProgress();
-                    if(auto) {
-                        Console.Write(startTime.ToString("HH:mm:ss"));
-                        Console.Write(' ');
+                    if (isNewTitle)
+                    {
+                        Console.WriteLine($"Song: {result.Title}");
+                        _ = Task.Run(async () =>
+                        {
+                            HashSet<string> results = [];
+                            await foreach (var anime in AniDb.SearchSong(result.Title))
+                            {
+                                if (results.Add(anime))
+                                {
+                                    Console.WriteLine($"Anime : {anime}");
+                                }
+                            }
+                        });
                     }
-                    Console.WriteLine(text);
 
-                    if(!ConsoleHelper.IsRedirected && !auto) {
-                        Navigate(result.Url);
-                    }
-
-                    prevUrl = result.Url;
-                } else {
-                    if(!auto)
-                        Console.WriteLine(":(");
+                    prevTitle = result.Title;
                 }
-            } catch(Exception x) {
+                else
+                {
+                    if (!auto)
+                    {
+                        Console.WriteLine(":(");
+                    }
+                }
+            }
+            catch (Exception x)
+            {
                 Console.WriteLine("error: " + x.Message);
             }
 
-            if(!auto)
+            if (!auto)
+            {
                 break;
-
-            ConsoleHelper.WriteProgress("Idle... ");
+            }
 
             var nextStartTime = startTime + TimeSpan.FromSeconds(15);
-            while(DateTime.Now < nextStartTime)
+            while (DateTime.Now < nextStartTime)
+            {
                 await Task.Delay(100);
+            }
         }
     }
 
-    static void Navigate(string url) {
-        if(OperatingSystem.IsWindows()) {
+    private static void Navigate(string url)
+    {
+        if (OperatingSystem.IsWindows())
+        {
             using var proc = Process.Start("explorer", '"' + url + '"');
             proc.WaitForExit();
         }
     }
 
-    static ICaptureHelper CreateCaptureHelper() {
+    private static ICaptureHelper CreateCaptureHelper()
+    {
 #if WASAPI_CAPTURE
         return new WasapiCaptureHelper();
 #else
@@ -74,5 +92,4 @@ static class TagLive {
         return new MciCaptureHelper();
 #endif
     }
-
 }
